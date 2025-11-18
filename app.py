@@ -6,7 +6,7 @@ app = Flask(__name__)
 
 # --- API Details ---
 THIRD_PARTY_API_URL = "https://openrouter.ai/api/v1/chat/completions"
-MODEL_NAME = "mistralai/mistral-7b-instruct:free" 
+MODEL_NAME = "cognitivecomputations/dolphin-mistral-24b-venice-edition:free" 
 
 
 # --- NEW: Route to serve the HTML chat page ---
