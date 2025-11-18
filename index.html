@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>My AI Chat</title>
+    <!-- 1. Load Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['Inter', 'sans-serif'],
+                    },
+                },
+            },
+        }
+    </script>
+    <style>
+        /* Simple scrollbar styling */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #f1f5f9;
+            border-radius: 10px;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #94a3b8;
+            border-radius: 10px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #475569;
+        }
+    </style>
+</head>
+<body class="h-full bg-gray-100 font-sans flex items-center justify-center p-4">
+
+    <!-- Chat Container -->
+    <div class="flex flex-col w-full max-w-2xl h-[80vh] bg-white rounded-lg shadow-2xl overflow-hidden">
+        
+        <!-- Header -->
+        <header class="bg-gray-800 text-white p-4 shadow-md">
+            <h1 class="text-xl font-bold text-center">Chat with Dolphin-Mistral</h1>
+            <p class="text-sm text-center text-gray-300">Powered by your Vercel API</p>
+        </header>
+
+        <!-- Chat Messages -->
+        <main id="chat-window" class="flex-1 p-6 space-y-4 overflow-y-auto bg-gray-50">
+            <!-- Initial Bot Message -->
+            <div class="flex items-start space-x-3">
+                <div class="flex-shrink-0 bg-gray-800 text-white rounded-full w-8 h-8 flex items-center justify-center font-bold">AI</div>
+                <div class="bg-gray-200 p-3 rounded-lg max-w-xs md:max-w-md">
+                    <p class="text-sm text-gray-800">Hello! Ask me anything.</p>
+                </div>
+            </div>
+            
+            <!-- Messages will be added here by JavaScript -->
+            
+        </main>
+
+        <!-- Loading Indicator (hidden by default) -->
+        <div id="loading-indicator" class="hidden flex items-center justify-center p-3 space-x-2 bg-gray-50 border-t">
+             <div class="animate-spin rounded-full h-5 w-5 border-b-2 border-gray-900"></div>
+             <p class="text-sm text-gray-600">AI is thinking...</p>
+        </div>
+
+        <!-- Input Form -->
+        <footer class="bg-white border-t p-4 shadow-inner">
+            <form id="chat-form" class="flex items-center space-x-3">
+                <input 
+                    type="text" 
+                    id="message-input" 
+                    placeholder="Type your message..." 
+                    autocomplete="off"
+                    class="flex-1 w-full px-4 py-2 border border-gray-300 rounded-full focus:outline-none focus:ring-2 focus:ring-blue-500"
+                >
+                <button 
+                    type="submit" 
+                    id="send-button"
+                    class="flex-shrink-0 bg-blue-600 text-white rounded-full p-2 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
+                >
+                    <!-- Send Icon (SVG) -->
+                    <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6" viewBox="0 0 24 24" fill="currentColor">
+                        <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2 .01 7z"/>
+                    </svg>
+                </button>
+            </form>
+        </footer>
+
+    </div>
+
+    <script>
+        // Get elements from the DOM
+        const chatWindow = document.getElementById('chat-window');
+        const chatForm = document.getElementById('chat-form');
+        const messageInput = document.getElementById('message-input');
+        const sendButton = document.getElementById('send-button');
+        const loadingIndicator = document.getElementById('loading-indicator');
+
+        // This is the Vercel API endpoint for your Flask app
+        // We use a relative path, so it calls the API on the *same domain*
+        const API_ENDPOINT = '/api/chat';
+
+        // Listen for form submission
+        chatForm.addEventListener('submit', async (event) => {
+            event.preventDefault(); // Stop the form from reloading the page
+
+            // Get the user's message
+            const userMessage = messageInput.value.trim();
+            if (userMessage === '') {
+                return; // Don't send empty messages
+            }
+
+            // 1. Display the user's message
+            addMessageToChat(userMessage, 'user');
+
+            // 2. Clear the input and show loading
+            messageInput.value = '';
+            loadingIndicator.classList.remove('hidden');
+            sendButton.disabled = true;
+
+            try {
+                // 3. Send the message to the API
+                const response = await fetch(API_ENDPOINT, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({
+                        prompt: userMessage 
+                    }),
+                });
+
+                if (!response.ok) {
+                    // Handle API errors (like if your key is wrong)
+                    const errorData = await response.json();
+                    throw new Error(errorData.error || `HTTP error! Status: ${response.status}`);
+                }
+
+                // 4. Get the AI's response
+                const data = await response.json();
+                
+                // --- IMPORTANT ---
+                // We parse the response based on the OpenRouter/OpenAI standard format.
+                // Adjust this if your third-party provider's response is different.
+                const aiMessage = data.choices[0].message.content;
+                // --- --- --- ---
+
+                // 5. Display the AI's response
+                addMessageToChat(aiMessage, 'ai');
+
+            } catch (error) {
+                // 6. Show an error message in the chat
+                console.error('Error:', error);
+                addMessageToChat(`Sorry, something went wrong: ${error.message}`, 'error');
+            } finally {
+                // 7. Hide loading and re-enable the button
+                loadingIndicator.classList.add('hidden');
+                sendButton.disabled = false;
+                messageInput.focus(); // Focus the input for the next message
+            }
+        });
+
+        // Helper function to add a message to the chat window
+        function addMessageToChat(message, sender) {
+            let messageElement = document.createElement('div');
+            
+            if (sender === 'user') {
+                // User message (right-aligned)
+                messageElement.classList.add('flex', 'items-start', 'justify-end', 'space-x-3');
+                messageElement.innerHTML = `
+                    <div class="bg-blue-600 text-white p-3 rounded-lg max-w-xs md:max-w-md">
+                        <p class="text-sm">${message}</p>
+                    </div>
+                    <div class="flex-shrink-0 bg-blue-600 text-white rounded-full w-8 h-8 flex items-center justify-center font-bold">You</div>
+                `;
+            } else if (sender === 'ai') {
+                // AI message (left-aligned)
+                messageElement.classList.add('flex', 'items-start', 'space-x-3');
+                messageElement.innerHTML = `
+                    <div class="flex-shrink-0 bg-gray-800 text-white rounded-full w-8 h-8 flex items-center justify-center font-bold">AI</div>
+                    <div class="bg-gray-200 p-3 rounded-lg max-w-xs md:max-w-md">
+                        <p class="text-sm text-gray-800">${message}</p>
+                    </div>
+                `;
+            } else {
+                // Error message (center-aligned)
+                messageElement.classList.add('flex', 'justify-center');
+                messageElement.innerHTML = `
+                    <div class="bg-red-100 border border-red-400 text-red-700 px-4 py-2 rounded-lg text-sm">
+                        <p>${message}</p>
+                    </div>
+                `;
+            }
+            
+            chatWindow.appendChild(messageElement);
+            
+            // Scroll to the bottom of the chat window
+            chatWindow.scrollTop = chatWindow.scrollHeight;
+        }
+
+    </script>
+</body>
+</html>
