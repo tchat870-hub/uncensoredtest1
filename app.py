@@ -1,21 +1,27 @@
 import os
 import requests
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, send_from_directory
 
 app = Flask(__name__)
 
-# This is the API endpoint for OpenRouter
+# --- API Details ---
 THIRD_PARTY_API_URL = "https://openrouter.ai/api/v1/chat/completions"
-
-# This is the name of the model you want to use
-# Find the exact name on OpenRouter's website (e.g., "cognitivecomputations/dolphin-mistral-latest")
 MODEL_NAME = "cognitivecomputations/dolphin-mistral-latest" 
 
-# --- Your Main API Endpoint ---
+
+# --- NEW: Route to serve the HTML chat page ---
+@app.route('/')
+def home():
+    # This line tells Flask to find 'index.html' in the same directory ('.')
+    # and send it to the user's browser.
+    return send_from_directory('.', 'index.html')
+
+
+# --- Your API Endpoint (this code is the same) ---
 @app.route('/api/chat', methods=['POST'])
 def chat_handler():
     try:
-        # 1. Get the user's prompt from the request
+        # 1. Get the user's prompt
         data = request.json
         user_prompt = data.get('prompt')
 
@@ -23,7 +29,6 @@ def chat_handler():
             return jsonify({"error": "No prompt provided"}), 400
 
         # 2. Get your SECRET API key from Vercel's environment variables
-        #    NEVER put your key directly in the code.
         api_key = os.environ.get("MY_SECRET_API_KEY")
         if not api_key:
             return jsonify({"error": "API key not configured"}), 500
@@ -58,7 +63,8 @@ def chat_handler():
         # Handle other unexpected errors
         return jsonify({"error": f"An unexpected error occurred: {e}"}), 500
 
-# A simple root route to check if your server is running
-@app.route('/')
-def home():
-    return "Your Flask API is running on Vercel!"
+# --- NEW: Add a handler for favicon.ico ---
+# Browsers automatically ask for this icon; this stops a 404 error in your logs
+@app.route('/favicon.ico')
+def favicon():
+    return '', 204
